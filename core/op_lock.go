@@ -1,7 +1,8 @@
 package core
 
 import (
-	"backuper/base"
+	"github.com/n-boy/backuper/base"
+
 	"fmt"
 	"os"
 	"path/filepath"

@@ -9,8 +9,8 @@ import (
 
 	"gopkg.in/yaml.v2"
 
-	"backuper/base"
-	"backuper/crypter"
+	"github.com/n-boy/backuper/base"
+	"github.com/n-boy/backuper/crypter"
 )
 
 const (

@@ -1,10 +1,10 @@
 package storage
 
 import (
-	"backuper/base"
-	"backuper/crypter"
-	"backuper/storage/toglacier"
-	"backuper/storage/tolocalfs"
+	"github.com/n-boy/backuper/base"
+	"github.com/n-boy/backuper/crypter"
+	"github.com/n-boy/backuper/storage/toglacier"
+	"github.com/n-boy/backuper/storage/tolocalfs"
 
 	"fmt"
 	"reflect"

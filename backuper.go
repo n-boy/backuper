@@ -1,12 +1,13 @@
 package main
 
 import (
-	"backuper/base"
-	"backuper/cmds"
-	"backuper/core"
 	"flag"
 	"fmt"
 	"os"
+
+	"github.com/n-boy/backuper/base"
+	"github.com/n-boy/backuper/cmds"
+	"github.com/n-boy/backuper/core"
 )
 
 func main() {

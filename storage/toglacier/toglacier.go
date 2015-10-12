@@ -15,8 +15,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/service/glacier"
 
-	"backuper/base"
-	"backuper/crypter"
+	"github.com/n-boy/backuper/base"
+	"github.com/n-boy/backuper/crypter"
 )
 
 type GlacierStorage struct {

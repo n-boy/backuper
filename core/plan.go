@@ -12,9 +12,9 @@ import (
 
 	"gopkg.in/yaml.v2"
 
-	"backuper/base"
-	"backuper/crypter"
-	"backuper/storage"
+	"github.com/n-boy/backuper/base"
+	"github.com/n-boy/backuper/crypter"
+	"github.com/n-boy/backuper/storage"
 )
 
 type BackupPlan struct {

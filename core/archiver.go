@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 
-	"backuper/base"
+	"github.com/n-boy/backuper/base"
 )
 
 func ArchiveNodes(nodes []NodeMetaInfo, archFilePath string) (nodesArch []NodeMetaInfo) {

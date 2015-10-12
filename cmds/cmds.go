@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"backuper/base"
-	"backuper/core"
-	"backuper/storage"
+	"github.com/n-boy/backuper/base"
+	"github.com/n-boy/backuper/core"
+	"github.com/n-boy/backuper/storage"
 )
 
 func Create() {

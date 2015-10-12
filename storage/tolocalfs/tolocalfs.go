@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"backuper/base"
-	"backuper/crypter"
+	"github.com/n-boy/backuper/base"
+	"github.com/n-boy/backuper/crypter"
 )
 
 type LocalFSStorage struct {
