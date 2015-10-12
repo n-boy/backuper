@@ -30,7 +30,9 @@ type GenericStorageFileInfo interface {
 func InitApp() {
 	createAppDir()
 	initLog()
-	getAppLock()
+	if runtime.GOOS != "windows" {
+		getAppLock()
+	}
 
 	// lockch := make(chan lockfile.Lockfile, 1)
 	// go func() {
@@ -43,7 +45,9 @@ func InitApp() {
 }
 
 func FinishApp() {
-	releaseAppLock()
+	if runtime.GOOS != "windows" {
+		releaseAppLock()
+	}
 }
 
 func initLog() {
