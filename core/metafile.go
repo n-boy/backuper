@@ -12,7 +12,7 @@ import (
 
 	"gopkg.in/yaml.v2"
 
-	"backuper/base"
+	"github.com/n-boy/backuper/base"
 )
 
 type ArchiveMetafile struct {
