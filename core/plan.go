@@ -254,7 +254,7 @@ func (plan BackupPlan) GetProcessNodes(guardNodes []NodeMetaInfo, archNodesMap m
 	procNodes := make([]NodeMetaInfo, 0)
 	for _, node := range guardNodes {
 		anode, anode_exists := archNodesMap[node.path]
-		if !anode_exists || anode.size != node.size || !anode.modtime.Equal(node.modtime) {
+		if !anode_exists || anode.size != node.size || !anode.modtime.Truncate(time.Second).Equal(node.modtime.Truncate(time.Second)) {
 			procNodes = append(procNodes, node)
 		}
 	}
