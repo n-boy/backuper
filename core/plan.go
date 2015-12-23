@@ -40,7 +40,7 @@ type yamlBackupPlanStruct struct {
 
 var planFilename string = "plan.yaml"
 
-// суммарный размер пачки файлов покуемых в отдельный архив, МБ
+// суммарный размер пачки файлов пакуемых в отдельный архив, МБ
 var DefaultChunkSizeMB int64 = 1024
 
 // допустипое превышение размера пачки файлов для архива, %
@@ -254,7 +254,10 @@ func (plan BackupPlan) GetProcessNodes(guardNodes []NodeMetaInfo, archNodesMap m
 	procNodes := make([]NodeMetaInfo, 0)
 	for _, node := range guardNodes {
 		anode, anode_exists := archNodesMap[node.path]
-		if !anode_exists || anode.size != node.size || !anode.modtime.Truncate(time.Second).Equal(node.modtime.Truncate(time.Second)) {
+		if !anode_exists ||
+			(!node.is_dir &&
+				(anode.size != node.size ||
+					!anode.modtime.Truncate(time.Second).Equal(node.modtime.Truncate(time.Second)))) {
 			procNodes = append(procNodes, node)
 		}
 	}
