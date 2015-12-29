@@ -1,39 +1,40 @@
 package core_test
 
 import (
+	"github.com/n-boy/backuper/base"
 	"github.com/n-boy/backuper/core"
 	"github.com/n-boy/backuper/storage"
 
+	"fmt"
 	"math/rand"
 	"os"
 	"path/filepath"
+	"regexp"
+	"sort"
 	"strings"
 	"testing"
+	"time"
 )
 
 type FilesysTestCase struct {
-	create      []string
-	modify      []string
-	modify_size []string
-	modify_time []string
-	result      []string
+	name          string
+	cmds_to_apply map[string][]string
+	result        []string
 }
 
-func TestGetProcessNodes(t *testing.T) {
-	testTmpDir := createTestTmpDir()
-	plan := createTestPlan(testTmpDir)
-
-	testCases := make([]FilesysTestCase)
-
-	//init filesystem
-	append(testCases, FilesysTestCase{
-		create: []string{
-			"dir1/file1.txt",
-			"dir1/file2.txt",
-			"dir1/dir2/file3.txt",
-			"dir3",
+var TestCasesGetProcessNodes []FilesysTestCase = []FilesysTestCase{
+	{
+		name: "init filesystem",
+		cmds_to_apply: map[string][]string{
+			"create": []string{
+				"dir1/file1.txt",
+				"dir1/file2.txt",
+				"dir1/dir2/file3.txt",
+				"dir3",
+			},
 		},
 		result: []string{
+			".",
 			"dir1",
 			"dir1/file1.txt",
 			"dir1/file2.txt",
@@ -41,66 +42,254 @@ func TestGetProcessNodes(t *testing.T) {
 			"dir1/dir2/file3.txt",
 			"dir3",
 		},
-	})
+	},
 
-	//create file
-	append(testCases, FilesysTestCase{
-		create: []string{
-			"dir3/file4.txt",
+	{
+		name: "create file",
+		cmds_to_apply: map[string][]string{
+			"create": []string{
+				"dir3/file4.txt",
+			},
 		},
 		result: []string{
 			"dir3/file4.txt",
 		},
-	})
+	},
 
-	//create dir
-	append(testCases, FilesysTestCase{
-		create: []string{
-			"dir3/dir4",
+	{
+		name: "create dir",
+		cmds_to_apply: map[string][]string{
+			"create": []string{
+				"dir3/dir4",
+			},
 		},
 		result: []string{
 			"dir3/dir4",
 		},
-	})
+	},
 
-	//modify files
-	append(testCases, FilesysTestCase{
-		modify: []string{
-			"dir1/file1.txt",
-			"dir1/file2.txt",
+	{
+		name: "modify files",
+		cmds_to_apply: map[string][]string{
+			"modify": []string{
+				"dir1/file1.txt",
+				"dir1/file2.txt",
+			},
 		},
 		result: []string{
 			"dir1/file1.txt",
 			"dir1/file2.txt",
 		},
-	})
+	},
 
-	//modify_time for file & dir
-	append(testCases, FilesysTestCase{
-		modify_time: []string{
-			"dir1/file1.txt",
-			"dir1",
+	{
+		name: "modify_time for file & dir",
+		cmds_to_apply: map[string][]string{
+			"modify_time": []string{
+				"dir1/file1.txt",
+				"dir1",
+			},
 		},
 		result: []string{
 			"dir1/file1.txt",
 		},
-	})
+	},
 
-	//modify_size for file
-	append(testCases, FilesysTestCase{
-		modify_size: []string{
-			"dir1/file2.txt",
+	{
+		name: "modify_size for file",
+		cmds_to_apply: map[string][]string{
+			"modify_size": []string{
+				"dir1/file2.txt",
+			},
 		},
 		result: []string{
 			"dir1/file2.txt",
 		},
-	})
+	},
 
-	//modify nothing
-	append(testCases, FilesysTestCase{
+	{
+		name:   "modify nothing",
 		result: []string{},
-	})
+	},
+}
 
+func TestGetProcessNodes(t *testing.T) {
+	testTmpDir := createTestTmpDir()
+	base.InitApp(base.AppConfig{
+		AppDir:         filepath.Join(testTmpDir, "_app"),
+		LogToStdout:    false,
+		LogErrToStderr: false,
+	})
+	plan := createTestPlan(testTmpDir)
+	testDataTmpDir := filepath.Join(testTmpDir, "_data")
+
+	for step, tc := range TestCasesGetProcessNodes {
+		if err := fsApplyTestCase(testDataTmpDir, tc); err != nil {
+			t.Fatalf("Test died. Step: %v, Name: %v, error: %v\n", step, tc.name, err)
+		}
+
+		guardNodes := plan.GetGuardedNodes()
+		archNodesMap := plan.GetArchivedNodesMap()
+
+		procNodes := plan.GetProcessNodes(guardNodes, archNodesMap)
+		var procNodesPathes sort.StringSlice
+		for _, node := range procNodes {
+			relPath, _ := filepath.Rel(testDataTmpDir, node.GetNodePath())
+			procNodesPathes = append(procNodesPathes, relPath)
+		}
+
+		procNodesPathes.Sort()
+		correctResult := sort.StringSlice(tc.result)
+		correctResult.Sort()
+
+		if fmt.Sprintf("%v", procNodesPathes) == fmt.Sprintf("%v", correctResult) {
+			t.Logf("Test passed. Step: %v, Name: %v\n", step, tc.name)
+		} else {
+			t.Errorf("Test failed. Step: %v, Name: %v, expected: %v, got: %v\n", step, tc.name, correctResult, procNodesPathes)
+		}
+
+		if err := plan.DoBackup(); err != nil {
+			t.Fatalf("Test died. Step: %v, Name: %v, error: %v\n", step, tc.name, err)
+		}
+	}
+	removeTestTmpDir(testTmpDir)
+}
+
+func fsApplyTestCase(basePath string, tc FilesysTestCase) error {
+	for cmd, pathes := range tc.cmds_to_apply {
+		for _, relPath := range pathes {
+			var err error
+			switch cmd {
+			case "create":
+				err = fsCreate(relPath, basePath)
+			case "modify":
+				err = fsModify(relPath, basePath)
+			case "modify_time":
+				err = fsModifyTime(relPath, basePath)
+			case "modify_size":
+				err = fsModifySize(relPath, basePath)
+			default:
+				err = fmt.Errorf("Command is not supported: %v", cmd)
+			}
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func fsCreate(relPath, basePath string) error {
+	isDir, absNodePath, absParentPath, err := fsSplitPath(relPath, basePath)
+	if err != nil {
+		return err
+	}
+
+	os.MkdirAll(absParentPath, 0770)
+	if isDir {
+		err := os.Mkdir(absNodePath, 0770)
+		if err != nil {
+			return err
+		}
+	} else {
+		fw, err := os.Create(absNodePath)
+		if err != nil {
+			return err
+		}
+		defer fw.Close()
+
+		_, err = fw.WriteString(randString(10))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func fsModify(relPath, basePath string) error {
+	isDir, _, _, err := fsSplitPath(relPath, basePath)
+	if err != nil {
+		return err
+	}
+
+	if isDir {
+		return fsModifyTime(relPath, basePath)
+	} else {
+		if err := fsModifySize(relPath, basePath); err != nil {
+			return err
+		}
+		return fsModifyTime(relPath, basePath)
+	}
+}
+
+func fsModifyTime(relPath, basePath string) error {
+	_, absNodePath, _, err := fsSplitPath(relPath, basePath)
+	if err != nil {
+		return err
+	}
+	if err = fsCheckExists(absNodePath); err != nil {
+		return err
+	}
+
+	fi, _ := os.Stat(absNodePath)
+	newModTime := fi.ModTime().Add(time.Second)
+
+	return os.Chtimes(absNodePath, newModTime, newModTime)
+}
+
+func fsModifySize(relPath, basePath string) error {
+	isDir, absNodePath, _, err := fsSplitPath(relPath, basePath)
+	if err != nil {
+		return err
+	}
+	if err = fsCheckExists(absNodePath); err != nil {
+		return err
+	}
+
+	if isDir {
+		return fmt.Errorf("Can not change size for directory, relpath: %v", relPath)
+	} else {
+		fi, _ := os.Stat(absNodePath)
+		oldModTime := fi.ModTime()
+
+		fw, err := os.OpenFile(absNodePath, os.O_APPEND|os.O_WRONLY, 0600)
+		if err == nil {
+			_, err = fw.WriteString(randString(10))
+			if err == nil {
+				err = os.Chtimes(absNodePath, oldModTime, oldModTime)
+			}
+		}
+		return err
+	}
+	return nil
+
+}
+
+func fsCheckExists(absNodePath string) error {
+	_, err := os.Stat(absNodePath)
+	if os.IsNotExist(err) {
+		return fmt.Errorf("Path for modify not exists, abspath: %v", absNodePath)
+	}
+	return nil
+}
+
+func fsSplitPath(relPath, basePath string) (isDir bool, absNodePath string, absParentPath string, err error) {
+	relPath = filepath.FromSlash(relPath)
+	nodeName := filepath.Base(relPath)
+	if nodeName == "" {
+		err = fmt.Errorf("Relative path could not be empty: %v", relPath)
+		return
+	}
+
+	if !regexp.MustCompile(`.+\..+`).MatchString(nodeName) {
+		isDir = true
+	}
+
+	absParentPath = filepath.Join(basePath, filepath.Dir(relPath))
+	absNodePath = filepath.Join(absParentPath, nodeName)
+
+	// fmt.Printf("%v, %v, %v\n", relPath, absParentPath)
+	return
 }
 
 func createTestPlan(testTmpDir string) core.BackupPlan {
@@ -112,7 +301,7 @@ func createTestPlan(testTmpDir string) core.BackupPlan {
 	var plan core.BackupPlan
 	plan.Name = "test_plan_" + randString(20)
 	plan.ChunkSize = core.DefaultChunkSizeMB * 1024 * 1024
-	append(plan.NodesToArchive, filepath.Join(testTmpDir, "_data"))
+	plan.NodesToArchive = append(plan.NodesToArchive, filepath.Join(testTmpDir, "_data"))
 
 	testStorageConfig := map[string]string{
 		"path": filepath.Join(testTmpDir, "_storage"),
@@ -125,14 +314,27 @@ func createTestPlan(testTmpDir string) core.BackupPlan {
 		panic(err)
 	}
 
+	plan, err = core.GetBackupPlan(plan.Name)
+	if err != nil {
+		panic(err)
+	}
+
 	return plan
 }
 
 func createTestTmpDir() string {
-	dirPath = filepath.Join(tmpDir(), randString(20))
-	os.Mkdir(dirPath, 0770)
-	for i, subDir := range []string{"_storage", "_data"} {
-		os.Mkdir(filepath.Join(dirPath, subDir), 0770)
+	dirPath := filepath.Join(tmpDir(), randString(20))
+	err := os.Mkdir(dirPath, 0770)
+	if err == nil {
+		for _, subDir := range []string{"_storage", "_data", "_app"} {
+			err = os.Mkdir(filepath.Join(dirPath, subDir), 0770)
+			if err != nil {
+				break
+			}
+		}
+	}
+	if err != nil {
+		panic(err)
 	}
 	return dirPath
 }
@@ -149,7 +351,7 @@ func tmpDir() string {
 	varNames := []string{"TMPDIR", "TMP", "TEMP"}
 	val := ""
 	for _, v := range varNames {
-		val = os.GetEnv(v)
+		val = os.Getenv(v)
 		if val != "" {
 			break
 		}

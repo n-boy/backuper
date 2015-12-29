@@ -11,11 +11,24 @@ import (
 	"github.com/nightlyone/lockfile"
 )
 
+type AppConfig struct {
+	AppDir         string
+	LogToStdout    bool
+	LogErrToStderr bool
+}
+
+var DefaultAppConfig AppConfig = AppConfig{
+	LogToStdout:    true,
+	LogErrToStderr: true,
+}
+
 var (
 	Log    *log.Logger
 	LogErr *log.Logger
 
 	appLock lockfile.Lockfile
+
+	appConfig AppConfig
 )
 var ErrStorageRequestInProgress = errors.New("Request to storage is in progress")
 var ErrLocalMetaExists = errors.New("Can't start synchronizing metadata. Local metafiles exists in plan directory")
@@ -27,8 +40,16 @@ type GenericStorageFileInfo interface {
 	GetFileStorageId() map[string]string
 }
 
-func InitApp() {
-	createAppDir()
+func InitApp(config AppConfig) {
+	appConfig = config
+	if appConfig.AppDir == "" {
+		appConfig.AppDir = createAppDir()
+	}
+
+	if _, err := os.Stat(appConfig.AppDir); os.IsNotExist(err) {
+		panic(err)
+	}
+
 	initLog()
 	if runtime.GOOS != "windows" {
 		getAppLock()
@@ -42,6 +63,7 @@ func InitApp() {
 	// 		os.Exit(1)
 	// 	}
 	// }()
+
 }
 
 func FinishApp() {
@@ -57,11 +79,28 @@ func initLog() {
 	if err != nil {
 		panic(err)
 	}
-	Log = log.New(io.MultiWriter(fh, os.Stdout), "[INFO] ", log.LstdFlags)
-	LogErr = log.New(io.MultiWriter(fh, os.Stderr), "[ERROR] ", log.LstdFlags)
+
+	w := io.MultiWriter(fh)
+	if appConfig.LogToStdout {
+		w = io.MultiWriter(fh, os.Stdout)
+	}
+	Log = log.New(w, "[INFO] ", log.LstdFlags)
+
+	w = io.MultiWriter(fh)
+	if appConfig.LogToStdout {
+		w = io.MultiWriter(fh, os.Stderr)
+	}
+	LogErr = log.New(w, "[ERROR] ", log.LstdFlags)
 }
 
 func GetAppDir() string {
+	if _, err := os.Stat(appConfig.AppDir); appConfig.AppDir == "" || os.IsNotExist(err) {
+		panic("AppDir is not initialized")
+	}
+	return appConfig.AppDir
+}
+
+func createAppDir() string {
 	var basePath string
 
 	switch runtime.GOOS {
@@ -70,14 +109,14 @@ func GetAppDir() string {
 	case "darwin":
 		basePath = filepath.Join(os.Getenv("HOME"), "Library", "Application Support")
 	}
-	return filepath.Join(basePath, "Backuper")
-}
+	appDir := filepath.Join(basePath, "Backuper")
 
-func createAppDir() {
-	err := os.Mkdir(GetAppDir(), 0770)
+	err := os.Mkdir(appDir, 0770)
 	if err != nil && !os.IsExist(err) {
 		panic(err)
 	}
+
+	return appDir
 }
 
 func getAppLock() {

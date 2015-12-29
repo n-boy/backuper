@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	base.InitApp()
+	base.InitApp(base.DefaultAppConfig)
 
 	parseCmd()
 
