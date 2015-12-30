@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -17,9 +18,10 @@ import (
 )
 
 type FilesysTestCase struct {
-	name          string
-	cmds_to_apply map[string][]string
-	result        []string
+	name              string
+	skip_on_platforms []string
+	cmds_to_apply     map[string][]string
+	result            []string
 }
 
 var TestCasesGetProcessNodes []FilesysTestCase = []FilesysTestCase{
@@ -83,7 +85,8 @@ var TestCasesGetProcessNodes []FilesysTestCase = []FilesysTestCase{
 	},
 
 	{
-		name: "modify_time for file & dir",
+		name:              "modify_time for file & dir",
+		skip_on_platforms: []string{"windows"},
 		cmds_to_apply: map[string][]string{
 			"modify_time": []string{
 				"dir1/file1.txt",
@@ -123,6 +126,8 @@ func TestGetProcessNodes(t *testing.T) {
 	plan := createTestPlan(testTmpDir)
 	testDataTmpDir := filepath.Join(testTmpDir, "_data")
 
+	platform := runtime.GOOS
+
 	for step, tc := range TestCasesGetProcessNodes {
 		if err := fsApplyTestCase(testDataTmpDir, tc); err != nil {
 			t.Fatalf("Test died. Step: %v, Name: %v, error: %v\n", step, tc.name, err)
@@ -139,13 +144,28 @@ func TestGetProcessNodes(t *testing.T) {
 		}
 
 		procNodesPathes.Sort()
-		correctResult := sort.StringSlice(tc.result)
+
+		correctResult := make(sort.StringSlice, 0)
+		for _, item := range tc.result {
+			correctResult = append(correctResult, filepath.FromSlash(item))
+		}
 		correctResult.Sort()
 
-		if fmt.Sprintf("%v", procNodesPathes) == fmt.Sprintf("%v", correctResult) {
-			t.Logf("Test passed. Step: %v, Name: %v\n", step, tc.name)
+		skip := false
+		for _, p := range tc.skip_on_platforms {
+			if p == platform {
+				skip = true
+				continue
+			}
+		}
+		if skip {
+			t.Logf("Test skipped. Step: %v, Name: %v\n", step, tc.name)
 		} else {
-			t.Errorf("Test failed. Step: %v, Name: %v, expected: %v, got: %v\n", step, tc.name, correctResult, procNodesPathes)
+			if fmt.Sprintf("%v", procNodesPathes) == fmt.Sprintf("%v", correctResult) {
+				t.Logf("Test passed. Step: %v, Name: %v\n", step, tc.name)
+			} else {
+				t.Errorf("Test failed. Step: %v, Name: %v, expected: %v, got: %v\n", step, tc.name, correctResult, procNodesPathes)
+			}
 		}
 
 		if err := plan.DoBackup(); err != nil {
@@ -261,8 +281,6 @@ func fsModifySize(relPath, basePath string) error {
 		}
 		return err
 	}
-	return nil
-
 }
 
 func fsCheckExists(absNodePath string) error {
