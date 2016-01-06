@@ -12,6 +12,7 @@ import (
 	"github.com/n-boy/backuper/base"
 	"github.com/n-boy/backuper/core"
 	"github.com/n-boy/backuper/storage"
+	"github.com/n-boy/backuper/webui"
 )
 
 func Create() {
@@ -282,6 +283,10 @@ func Sync(plan core.BackupPlan) {
 			break
 		}
 	}
+}
+
+func WebUI(plan core.BackupPlan) {
+	webui.Init(plan.Name)
 }
 
 func getInput(title string, defaultValue string, checkFunc func(string) error) string {

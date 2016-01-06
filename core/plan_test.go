@@ -358,7 +358,7 @@ func createTestTmpDir() string {
 }
 
 func removeTestTmpDir(dirPath string) {
-	if isPathInBasePath(tmpDir(), dirPath) {
+	if base.IsPathInBasePath(tmpDir(), dirPath) {
 		os.RemoveAll(dirPath)
 	} else {
 		panic("Could not remove files from non-tmp path")
@@ -378,14 +378,6 @@ func tmpDir() string {
 		panic("No tmp path determined")
 	}
 	return val
-}
-
-func isPathInBasePath(basePath, path string) bool {
-	r, err := filepath.Rel(basePath, path)
-	if err == nil && strings.Split(r, string(filepath.Separator))[0] != ".." {
-		return true
-	}
-	return false
 }
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")

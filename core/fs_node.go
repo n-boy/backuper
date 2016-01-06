@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/n-boy/backuper/base"
 )
 
 type NodeMetaInfo struct {
@@ -43,7 +45,15 @@ func (node *NodeMetaInfo) GetNodePath() string {
 }
 
 func (node *NodeMetaInfo) isNodeInPath(path string) bool {
-	return isPathInBasePath(path, node.path)
+	return base.IsPathInBasePath(path, node.path)
+}
+
+func (node *NodeMetaInfo) IsDir() bool {
+	return node.is_dir
+}
+
+func (node *NodeMetaInfo) Size() int64 {
+	return node.size
 }
 
 func GetNodeCurrentFormat() []string {

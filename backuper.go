@@ -22,7 +22,7 @@ func parseCmd() {
 	var planName = flag.String("plan", "", "")
 	var createPlan = flag.Bool("create-plan", false, "")
 	cmd_flags := make(map[string]*bool)
-	cmd_list := []string{"edit", "view", "status", "backup", "restore", "sync"}
+	cmd_list := []string{"edit", "view", "status", "backup", "restore", "sync", "web-ui"}
 	for _, cmd := range cmd_list {
 		cmd_flags[cmd] = flag.Bool(cmd, false, "")
 	}
@@ -73,6 +73,8 @@ func parseCmd() {
 				cmds.Restore(plan)
 			case "sync":
 				cmds.Sync(plan)
+			case "web-ui":
+				cmds.WebUI(plan)
 			case "":
 				fmt.Println("One command must be selected to run for plan\n")
 				flag.Usage()

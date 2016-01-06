@@ -184,6 +184,22 @@ func (plan BackupPlan) GetArchivedNodesMap() map[string]NodeMetaInfo {
 	return nodesMap
 }
 
+func (plan BackupPlan) GetArchivedNodesAllRevMap() map[string][]NodeMetaInfo {
+	nodesMap := make(map[string][]NodeMetaInfo)
+
+	metafiles := plan.GetMetaFiles()
+	for _, filename := range metafiles {
+		archMeta := plan.GetMetaFile(filename)
+		for _, node := range archMeta.GetNodes() {
+			if _, exists := nodesMap[node.path]; !exists {
+				nodesMap[node.path] = make([]NodeMetaInfo, 0)
+			}
+			nodesMap[node.path] = append(nodesMap[node.path], node)
+		}
+	}
+	return nodesMap
+}
+
 func (plan BackupPlan) GetMetaFiles() MetafileList {
 	var metafiles []string
 	var err error
@@ -481,12 +497,4 @@ func (plan BackupPlan) CleanLocalMeta() error {
 		}
 	}
 	return nil
-}
-
-func isPathInBasePath(basePath, path string) bool {
-	r, err := filepath.Rel(basePath, path)
-	if err == nil && strings.Split(r, string(filepath.Separator))[0] != ".." {
-		return true
-	}
-	return false
 }

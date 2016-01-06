@@ -1,0 +1,35 @@
+<html>
+<head>
+	<title>List of archived items for plan {{.PlanName}}</title>
+
+	<link type="text/css" rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<div id="body_container">
+	<div id="page_header">List of <u>archived items</u> for plan <b>{{.PlanName}}</b></div>
+	<div id="path_list">
+		{{ range $index, $p := .BasePathList }}
+		<a href="?basePath={{$p.Path}}">{{$p.ShortPath}}</a> {{$.PathSeparator}}
+		{{ end }}
+	</div>
+	<div class="table_container">
+		<table cellspacing="0" cellpadding="4" border="0">
+		<tr>
+			<!--td rowspan="2">&nbsp;</td-->
+			<td>Path</td>
+			<td width="80">Archived, Last rev.</td>
+			<td width="80">Archived, All rev.</td>
+		</tr>
+		{{ range $index, $inode := .NodesList }}
+		<tr>
+			<!--td>&nbsp;</td-->
+			<td><a {{if $inode.IsDir}}href="?basePath={{$inode.Path}}"{{end}}>{{$inode.ShortPath}}</a></td>
+			<td align="right">{{filesizeHumanView $inode.LastRevSize}}</td>
+			<td align="right">{{filesizeHumanView $inode.AllRevSize}}</td>
+		</tr>
+		{{ end }}
+		</table>
+	</div>
+</div>
+</body>
+</html>

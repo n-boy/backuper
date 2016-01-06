@@ -83,7 +83,7 @@ func (plan BackupPlan) InitRestore(pathList []string, restorePoint *ArchiveMetaf
 			if i == j {
 				continue
 			}
-			if isPathInBasePath(path, pathToCheck) {
+			if base.IsPathInBasePath(path, pathToCheck) {
 				isSubPath = true
 				break
 			}

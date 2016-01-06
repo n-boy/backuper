@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/nightlyone/lockfile"
 )
@@ -136,5 +137,48 @@ func releaseAppLock() {
 	err := appLock.Unlock()
 	if err != nil {
 		LogErr.Printf("Cannot release app lock: %v\n", err)
+	}
+}
+
+func IsPathInBasePath(basePath, path string) bool {
+	r, err := filepath.Rel(basePath, path)
+	if err == nil && strings.Split(r, string(filepath.Separator))[0] != ".." {
+		return true
+	}
+	return false
+}
+
+func IsSubPathToBasePath(basePath, path string) bool {
+	if IsPathInBasePath(basePath, path) {
+		r, _ := filepath.Rel(basePath, path)
+		if r != "" && r != "." {
+			return true
+		}
+	}
+	return false
+}
+
+func GetFirstLevelPath(basePath, path string) string {
+	if path == "" || (basePath != "" && !IsSubPathToBasePath(basePath, path)) {
+		return ""
+	} else if basePath == "" {
+		return GetPathFirstPart(path)
+	}
+
+	r, err := filepath.Rel(basePath, path)
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(basePath, GetPathFirstPart(r))
+}
+
+func GetPathFirstPart(path string) string {
+	parts := strings.Split(path, string(filepath.Separator))
+	if len(parts) == 0 {
+		return ""
+	} else if parts[0] == "" && len(parts) > 1 {
+		return strings.Join(parts[0:2], string(filepath.Separator))
+	} else {
+		return parts[0]
 	}
 }
