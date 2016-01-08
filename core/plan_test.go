@@ -12,7 +12,6 @@ import (
 	"regexp"
 	"runtime"
 	"sort"
-	"strings"
 	"testing"
 	"time"
 )

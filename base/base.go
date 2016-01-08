@@ -174,11 +174,14 @@ func GetFirstLevelPath(basePath, path string) string {
 
 func GetPathFirstPart(path string) string {
 	parts := strings.Split(path, string(filepath.Separator))
+
+	pfp := ""
 	if len(parts) == 0 {
-		return ""
+		return pfp
 	} else if parts[0] == "" && len(parts) > 1 {
-		return strings.Join(parts[0:2], string(filepath.Separator))
+		pfp = strings.Join(parts[0:2], string(filepath.Separator))
 	} else {
-		return parts[0]
+		pfp = parts[0]
 	}
+	return filepath.Clean(pfp + string(filepath.Separator))
 }

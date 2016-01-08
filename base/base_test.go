@@ -27,15 +27,16 @@ func TestGetFirstLevelPath(t *testing.T) {
 		}
 	} else {
 		tests = []GFLPTest{
-			{"", "D:\\usr\\local\\bin", "D:"},
-			{"", "D:\\usr\\local\\file.txt", "D:"},
-			{"", "D:", "D:"},
-			{"D:", "D:\\usr\\local\\bin", "D:\\usr"},
+			{"", "D:\\usr\\local\\bin", "D:\\"},
+			{"", "D:\\usr\\local\\file.txt", "D:\\"},
+			{"", "D:\\", "D:\\"},
+			{"D:\\", "D:\\usr\\local\\bin", "D:\\usr"},
 			{"D:\\usr", "D:\\usr\\local\\bin", "D:\\usr\\local"},
 			{"D:\\usr", "D:\\usr", ""},
 			{"D:\\usr", "D:\\etc", ""},
 		}
 	}
+
 
 	for _, test := range tests {
 		flp := base.GetFirstLevelPath(test.basePath, test.path)

@@ -110,7 +110,13 @@ func cmd_ArchivedList(w http.ResponseWriter, r *http.Request, plan core.BackupPl
 				}
 				workPathArchivedNodesMap[flPath] = nodeUI
 			}
-			_, nodeUI.ShortPath = filepath.Split(nodeUI.Path)
+			d, f := filepath.Split(nodeUI.Path)
+			if f == "" {
+				nodeUI.ShortPath = d
+			} else {
+				nodeUI.ShortPath = f
+			}
+
 			for i, node := range nodes {
 				nodeUI.AllRevSize += node.Size()
 				if i == len(nodes)-1 {
@@ -138,7 +144,7 @@ func cmd_ArchivedList(w http.ResponseWriter, r *http.Request, plan core.BackupPl
 			}
 
 			p := make(map[string]string)
-			p["Path"] = strings.Join(parts[0:i+1], string(filepath.Separator))
+			p["Path"] = filepath.Clean(strings.Join(parts[0:i+1], string(filepath.Separator))+string(filepath.Separator))
 			p["ShortPath"] = part
 			basePathList = append(basePathList, p)
 		}
