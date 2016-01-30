@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"mime"
 	"net/http"
+	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -17,12 +18,15 @@ import (
 var currentPlanName string
 var templatesPath string = "webui/templates"
 
+var localFilesIndexByPlan map[string]map[string]core.NodeMetaInfo
+
 type NodeMetaInfoUI struct {
-	Path        string
-	ShortPath   string
-	LastRevSize int64
-	AllRevSize  int64
-	IsDir       bool
+	Path             string
+	ShortPath        string
+	LastRevSize      int64
+	AllRevSize       int64
+	LocalDeletedSize int64
+	IsDir            bool
 }
 
 func Init(planName string) {
@@ -31,9 +35,51 @@ func Init(planName string) {
 	}
 	currentPlanName = planName
 
+	base.Log.Println("Indexing local filesystem...")
+	err := indexLocalFiles(planName)
+	if err != nil {
+		base.LogErr.Fatalf("Error occured: %v", err)
+	}
+
+	base.Log.Println("Starting web service on http://localhost:8080")
 	http.HandleFunc("/static/", staticHandler)
 	http.HandleFunc("/", mainHandler)
 	http.ListenAndServe(":8080", nil)
+}
+
+func indexLocalFiles(planName string) error {
+	if localFilesIndexByPlan == nil {
+		localFilesIndexByPlan = make(map[string]map[string]core.NodeMetaInfo)
+	}
+
+	if _, exists := localFilesIndexByPlan[planName]; exists {
+		return nil
+	}
+
+	plan, err := core.GetBackupPlan(planName)
+	if err != nil {
+		return err
+	}
+
+	localFilesIndexByPlan[plan.Name] = make(map[string]core.NodeMetaInfo)
+	var nodes core.NodeList
+	for _, path := range plan.NodesToArchive {
+		if _, err = os.Stat(path); err != nil {
+			if os.IsNotExist(err) {
+				continue
+			} else {
+				return err
+			}
+		}
+		err = filepath.Walk(path, nodes.AddNodeToList)
+		if err != nil {
+			return err
+		}
+	}
+	for _, node := range nodes.GetList() {
+		localFilesIndexByPlan[plan.Name][node.GetNodePath()] = node
+	}
+	return nil
 }
 
 func mainHandler(w http.ResponseWriter, r *http.Request) {
@@ -92,6 +138,13 @@ func staticHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func cmd_ArchivedList(w http.ResponseWriter, r *http.Request, plan core.BackupPlan) {
+	err := indexLocalFiles(plan.Name)
+	if err != nil {
+		fmt.Fprintf(w, "Error occured while indexing local files of plan \"%s\": %v", plan.Name, err)
+		return
+	}
+	localFiles := localFilesIndexByPlan[plan.Name]
+
 	basePath := r.FormValue("basePath")
 	archivedNodesMap := plan.GetArchivedNodesAllRevMap()
 	workPathArchivedNodesMap := make(map[string]*NodeMetaInfoUI)
@@ -121,6 +174,9 @@ func cmd_ArchivedList(w http.ResponseWriter, r *http.Request, plan core.BackupPl
 				nodeUI.AllRevSize += node.Size()
 				if i == len(nodes)-1 {
 					nodeUI.LastRevSize += node.Size()
+					if _, exists := localFiles[node.GetNodePath()]; !exists {
+						nodeUI.LocalDeletedSize += node.Size()
+					}
 				}
 			}
 		}
@@ -144,7 +200,7 @@ func cmd_ArchivedList(w http.ResponseWriter, r *http.Request, plan core.BackupPl
 			}
 
 			p := make(map[string]string)
-			p["Path"] = filepath.Clean(strings.Join(parts[0:i+1], string(filepath.Separator))+string(filepath.Separator))
+			p["Path"] = filepath.Clean(strings.Join(parts[0:i+1], string(filepath.Separator)) + string(filepath.Separator))
 			p["ShortPath"] = part
 			basePathList = append(basePathList, p)
 		}

@@ -19,6 +19,7 @@
 			<td>Path</td>
 			<td width="80">Archived, Last rev.</td>
 			<td width="80">Archived, All rev.</td>
+			<td width="80">Locally deleted, by last rev.</td>
 		</tr>
 		{{ range $index, $inode := .NodesList }}
 		<tr>
@@ -26,6 +27,7 @@
 			<td><a {{if $inode.IsDir}}href="?basePath={{$inode.Path}}"{{end}}>{{$inode.ShortPath}}</a></td>
 			<td align="right">{{filesizeHumanView $inode.LastRevSize}}</td>
 			<td align="right">{{filesizeHumanView $inode.AllRevSize}}</td>
+			<td align="right">{{filesizeHumanView $inode.LocalDeletedSize}}</td>
 		</tr>
 		{{ end }}
 		</table>

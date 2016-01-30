@@ -163,7 +163,7 @@ func (plan *BackupPlan) SavePlan(overwrite bool) error {
 func (plan BackupPlan) GetGuardedNodes() []NodeMetaInfo {
 	var nodes NodeList
 	for _, path := range plan.NodesToArchive {
-		err := filepath.Walk(path, nodes.addNodeToList)
+		err := filepath.Walk(path, nodes.AddNodeToList)
 		if err != nil {
 			base.LogErr.Fatalln(err)
 		}

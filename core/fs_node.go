@@ -20,7 +20,7 @@ type NodeList struct {
 	list []NodeMetaInfo
 }
 
-func (nodes *NodeList) addNodeToList(path string, info os.FileInfo, err error) error {
+func (nodes *NodeList) AddNodeToList(path string, info os.FileInfo, err error) error {
 	if err != nil {
 		return err
 	}
