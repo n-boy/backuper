@@ -84,8 +84,7 @@ var TestCasesGetProcessNodes []FilesysTestCase = []FilesysTestCase{
 	},
 
 	{
-		name:              "modify_time for file & dir",
-		skip_on_platforms: []string{"windows"},
+		name: "modify_time for file & dir",
 		cmds_to_apply: map[string][]string{
 			"modify_time": []string{
 				"dir1/file1.txt",
@@ -274,6 +273,7 @@ func fsModifySize(relPath, basePath string) error {
 		fw, err := os.OpenFile(absNodePath, os.O_APPEND|os.O_WRONLY, 0600)
 		if err == nil {
 			_, err = fw.WriteString(randString(10))
+			fw.Close()
 			if err == nil {
 				err = os.Chtimes(absNodePath, oldModTime, oldModTime)
 			}
