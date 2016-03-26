@@ -1,6 +1,7 @@
 package cmds
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -290,18 +291,19 @@ func WebUI(plan core.BackupPlan) {
 }
 
 func getInput(title string, defaultValue string, checkFunc func(string) error) string {
-	input := ""
+	reader := bufio.NewReader(os.Stdin)
 	for {
 		if defaultValue == "" {
 			fmt.Print(title + ": ")
 		} else {
 			fmt.Printf("%v (default: %v): ", title, defaultValue)
 		}
-		_, err := fmt.Scanln(&input)
-		if err != nil && err.Error() != "unexpected newline" {
+		inputBytes, _, err := reader.ReadLine()
+		if err != nil {
 			panic(err)
 		}
 
+		input := string(inputBytes)
 		if input == "" && defaultValue != "" {
 			return defaultValue
 		} else if err = checkFunc(input); err != nil {
