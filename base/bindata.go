@@ -206,12 +206,12 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"webui": &bintree{nil, map[string]*bintree{
-		"static": &bintree{nil, map[string]*bintree{
-			"styles.css": &bintree{webuiStaticStylesCss, map[string]*bintree{}},
+	"webui": {nil, map[string]*bintree{
+		"static": {nil, map[string]*bintree{
+			"styles.css": {webuiStaticStylesCss, map[string]*bintree{}},
 		}},
-		"templates": &bintree{nil, map[string]*bintree{
-			"archived_list.html": &bintree{webuiTemplatesArchived_listHtml, map[string]*bintree{}},
+		"templates": {nil, map[string]*bintree{
+			"archived_list.html": {webuiTemplatesArchived_listHtml, map[string]*bintree{}},
 		}},
 	}},
 }}

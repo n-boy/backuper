@@ -73,7 +73,7 @@ func (plan BackupPlan) InitRestore(pathList []string, restorePoint *ArchiveMetaf
 	archNodesToRestore := make(map[string][]NodeMetaInfo)
 
 	// clear path list from subpathes of each other
-	for i, _ := range pathList {
+	for i := range pathList {
 		pathList[i] = filepath.Clean(pathList[i])
 	}
 	pathListUniq := []string{}
