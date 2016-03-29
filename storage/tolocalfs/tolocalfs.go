@@ -76,7 +76,7 @@ func (ls LocalFSStorage) UploadFile(filePath string, encrypter *crypter.Encrypte
 		return result, err
 	}
 	if fileWriter.Close(); err != nil {
-		return result, err	
+		return result, err
 	}
 
 	if err = os.Rename(remoteFilepathShadow, remoteFilepath); err != nil {
@@ -115,7 +115,7 @@ func (ls LocalFSStorage) DownloadFile(fileStorageId map[string]string, localFile
 		return err
 	}
 	if fileWriter.Close(); err != nil {
-		return err	
+		return err
 	}
 
 	return os.Rename(localFilePathShadow, localFilePath)

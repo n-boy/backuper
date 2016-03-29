@@ -37,7 +37,6 @@ func TestGetFirstLevelPath(t *testing.T) {
 		}
 	}
 
-
 	for _, test := range tests {
 		flp := base.GetFirstLevelPath(test.basePath, test.path)
 		if flp == test.result {
