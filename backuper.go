@@ -1,3 +1,6 @@
+//go:generate $GOPATH/bin/go-bindata -pkg base -o base/bindata.go webui/templates/ webui/static/
+//go:generate gofmt -w -s base/bindata.go
+
 package main
 
 import (

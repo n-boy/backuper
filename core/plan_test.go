@@ -27,7 +27,7 @@ var TestCasesGetProcessNodes []FilesysTestCase = []FilesysTestCase{
 	{
 		name: "init filesystem",
 		cmds_to_apply: map[string][]string{
-			"create": []string{
+			"create": {
 				"dir1/file1.txt",
 				"dir1/file2.txt",
 				"dir1/dir2/file3.txt",
@@ -48,7 +48,7 @@ var TestCasesGetProcessNodes []FilesysTestCase = []FilesysTestCase{
 	{
 		name: "create file",
 		cmds_to_apply: map[string][]string{
-			"create": []string{
+			"create": {
 				"dir3/file4.txt",
 			},
 		},
@@ -60,7 +60,7 @@ var TestCasesGetProcessNodes []FilesysTestCase = []FilesysTestCase{
 	{
 		name: "create dir",
 		cmds_to_apply: map[string][]string{
-			"create": []string{
+			"create": {
 				"dir3/dir4",
 			},
 		},
@@ -72,7 +72,7 @@ var TestCasesGetProcessNodes []FilesysTestCase = []FilesysTestCase{
 	{
 		name: "modify files",
 		cmds_to_apply: map[string][]string{
-			"modify": []string{
+			"modify": {
 				"dir1/file1.txt",
 				"dir1/file2.txt",
 			},
@@ -86,7 +86,7 @@ var TestCasesGetProcessNodes []FilesysTestCase = []FilesysTestCase{
 	{
 		name: "modify_time for file & dir",
 		cmds_to_apply: map[string][]string{
-			"modify_time": []string{
+			"modify_time": {
 				"dir1/file1.txt",
 				"dir1",
 			},
@@ -99,7 +99,7 @@ var TestCasesGetProcessNodes []FilesysTestCase = []FilesysTestCase{
 	{
 		name: "modify_size for file",
 		cmds_to_apply: map[string][]string{
-			"modify_size": []string{
+			"modify_size": {
 				"dir1/file2.txt",
 			},
 		},
