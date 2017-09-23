@@ -2,22 +2,29 @@ package toglacier
 
 import (
 	"bufio"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/glacier"
 
 	"github.com/n-boy/backuper/base"
 	"github.com/n-boy/backuper/crypter"
 )
+
+// must be power of two
+const MultipartUploadPartSize = 8 * 1024 * 1024
 
 type GlacierStorage struct {
 	region                string `name:"region" title:"AWS Region"`
@@ -78,14 +85,82 @@ func (gs GlacierStorage) UploadFile(filePath string, encrypter *crypter.Encrypte
 		filename = filepath.Base(remoteFileName)
 	}
 
-	params := &glacier.UploadArchiveInput{
+	fileInfo, err := fileReader.Stat()
+	if err != nil {
+		return result, err
+	}
+
+	checksum := hex.EncodeToString(glacier.ComputeHashes(fileReader).TreeHash)
+
+	// initiate multipart upload
+	initUploadParams := &glacier.InitiateMultipartUploadInput{
 		AccountId:          aws.String("-"),
 		VaultName:          aws.String(gs.vault_name),
 		ArchiveDescription: aws.String(filename),
-		Body:               fileReader}
-
-	uploadResult, err := gs.getStorageClient().UploadArchive(params)
+		PartSize:           aws.String(strconv.FormatInt(MultipartUploadPartSize, 10))}
+	// panic(fmt.Errorf("%v", initUploadParams).Error())
+	initUploadResult, err := gs.getStorageClient().InitiateMultipartUpload(initUploadParams)
 	if err != nil {
+		return result, err
+	}
+
+	abortUploadParams := &glacier.AbortMultipartUploadInput{
+		AccountId: initUploadParams.AccountId,
+		UploadId:  initUploadResult.UploadId,
+		VaultName: initUploadParams.VaultName,
+	}
+
+	// upload archive parts, one-by-one
+	numOfParts := int64(math.Ceil(float64(fileInfo.Size()) / float64(MultipartUploadPartSize)))
+
+	for i := int64(0); i < numOfParts; i++ {
+		rangeStart := i * MultipartUploadPartSize
+		rangeFinish := (i+1)*MultipartUploadPartSize - 1
+		if rangeFinish >= fileInfo.Size() {
+			rangeFinish = fileInfo.Size() - 1
+		}
+
+		fileSectionReader := io.NewSectionReader(fileReader, rangeStart, rangeFinish-rangeStart+1)
+
+		uploadPartParams := &glacier.UploadMultipartPartInput{
+			AccountId: initUploadParams.AccountId,
+			UploadId:  initUploadResult.UploadId,
+			VaultName: initUploadParams.VaultName,
+			Body:      fileSectionReader,
+			Range:     aws.String(fmt.Sprintf("bytes %d-%d/*", rangeStart, rangeFinish)),
+		}
+
+		_, err := gs.getStorageClient().UploadMultipartPart(uploadPartParams)
+		if err != nil {
+			// errors ignoring upload aborting
+			_, err2 := gs.getStorageClient().AbortMultipartUpload(abortUploadParams)
+			if err2 != nil {
+				base.LogErr.Printf("Error while aborting multipart upload: %v", err2)
+			}
+
+			return result, err
+		} else {
+			base.Log.Println(fmt.Sprintf("Uploaded part %d of %d", i+1, numOfParts))
+		}
+	}
+
+	// complete multipart upload
+	completeUploadParams := &glacier.CompleteMultipartUploadInput{
+		AccountId:   initUploadParams.AccountId,
+		UploadId:    initUploadResult.UploadId,
+		VaultName:   initUploadParams.VaultName,
+		ArchiveSize: aws.String(strconv.FormatInt(fileInfo.Size(), 10)),
+		Checksum:    aws.String(checksum),
+	}
+
+	uploadResult, err := gs.getStorageClient().CompleteMultipartUpload(completeUploadParams)
+	if err != nil {
+		// errors ignoring upload aborting
+		_, err2 := gs.getStorageClient().AbortMultipartUpload(abortUploadParams)
+		if err2 != nil {
+			base.LogErr.Printf("Error while aborting multipart upload: %v", err2)
+		}
+
 		return result, err
 	}
 	err = fileReader.Close()
@@ -303,44 +378,16 @@ func (gs GlacierStorage) waitJobComplete(job *glacier.JobDescription, timeout in
 
 }
 
-// func (gs GlacierStorage) syncMetaInfo() error {
-
-// }
-
 func (gs GlacierStorage) getStorageClient() *glacier.Glacier {
 	creds := credentials.NewStaticCredentials(gs.aws_access_key_id, gs.aws_secret_access_key, "")
 
-	return glacier.New(&aws.Config{
-		Region:      aws.String(gs.region),
-		Credentials: creds,
-		LogLevel:    aws.LogLevel(1),
-	})
+	return glacier.New(session.Must(session.NewSession()),
+		&aws.Config{
+			Region:      aws.String(gs.region),
+			Credentials: creds,
+			LogLevel:    aws.LogLevel(1),
+		})
 }
-
-// func (gs GlacierStorage) GetFileIface(ffm map[string]string) base.GenericStorageFileInfo {
-// 	gfi := GlacierFileInfo{
-// 		ArchiveId:          ffm["ArchiveId"],
-// 		ArchiveDescription: ffm["ArchiveDescription"],
-// 		CreationDate:       ffm["CreationDate"],
-// 		SHA256TreeHash:     ffm["SHA256TreeHash"],
-// 	}
-// 	var err error
-// 	gfi.Size, err = strconv.ParseInt(ffm["Size"], 10, 64)
-// 	if err != nil {
-// 		base.LogErr.Fatalln(err)
-// 	}
-// 	return gfi
-// }
-
-// func (gfi GlacierFileInfo) GetFlatMap() map[string]string {
-// 	ffm := make(map[string]string)
-// 	ffm["ArchiveId"] = gfi.ArchiveId
-// 	ffm["ArchiveDescription"] = gfi.ArchiveDescription
-// 	ffm["CreationDate"] = gfi.CreationDate
-// 	ffm["SHA256TreeHash"] = gfi.SHA256TreeHash
-// 	ffm["Size"] = strconv.FormatInt(gfi.Size, 10)
-// 	return ffm
-// }
 
 func (gfi GlacierFileInfo) GetFilename() string {
 	return gfi.ArchiveDescription

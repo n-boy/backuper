@@ -1,0 +1,14 @@
+# use as a template for tests config
+# probably config with real keys/data should be kept somewhere outside application code
+storage_glacier:
+  # AWS Region
+  region: eu-central-1
+  # Vault Name
+  vault_name: TEST-VAULT
+  # Access Key ID
+  aws_access_key_id: QWERTY12345
+  # Secret Access Key
+  aws_secret_access_key: YTREWQ54321
+storage_localfs:
+  # Storage path
+  path: /my/tests/storage/path

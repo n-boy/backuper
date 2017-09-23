@@ -64,7 +64,6 @@ func InitApp(config AppConfig) {
 	// 		os.Exit(1)
 	// 	}
 	// }()
-
 }
 
 func FinishApp() {
@@ -73,25 +72,37 @@ func FinishApp() {
 	}
 }
 
-func initLog() {
-	filePath := filepath.Join(GetAppDir(), "history.log")
+func SetAppConfig(config AppConfig) {
+	appConfig = config
+}
 
-	fh, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-	if err != nil {
-		panic(err)
+func InitLogToDestination(dw *io.Writer) {
+	if dw == nil {
+		filePath := filepath.Join(GetAppDir(), "history.log")
+
+		fh, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		if err != nil {
+			panic(err)
+		}
+
+		*dw = fh
 	}
 
-	w := io.MultiWriter(fh)
+	w := io.MultiWriter(*dw)
 	if appConfig.LogToStdout {
-		w = io.MultiWriter(fh, os.Stdout)
+		w = io.MultiWriter(*dw, os.Stdout)
 	}
 	Log = log.New(w, "[INFO] ", log.LstdFlags)
 
-	w = io.MultiWriter(fh)
+	w = io.MultiWriter(*dw)
 	if appConfig.LogToStdout {
-		w = io.MultiWriter(fh, os.Stderr)
+		w = io.MultiWriter(*dw, os.Stderr)
 	}
 	LogErr = log.New(w, "[ERROR] ", log.LstdFlags)
+}
+
+func initLog() {
+	InitLogToDestination(nil)
 }
 
 func GetAppDir() string {

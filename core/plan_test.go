@@ -5,8 +5,9 @@ import (
 	"github.com/n-boy/backuper/core"
 	"github.com/n-boy/backuper/storage"
 
+	"github.com/n-boy/backuper/ut/testutils"
+
 	"fmt"
-	"math/rand"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -216,7 +217,7 @@ func fsCreate(relPath, basePath string) error {
 		}
 		defer fw.Close()
 
-		_, err = fw.WriteString(randString(10))
+		_, err = fw.WriteString(testutils.RandString(10))
 		if err != nil {
 			return err
 		}
@@ -272,7 +273,7 @@ func fsModifySize(relPath, basePath string) error {
 
 		fw, err := os.OpenFile(absNodePath, os.O_APPEND|os.O_WRONLY, 0600)
 		if err == nil {
-			_, err = fw.WriteString(randString(10))
+			_, err = fw.WriteString(testutils.RandString(10))
 			fw.Close()
 			if err == nil {
 				err = os.Chtimes(absNodePath, oldModTime, oldModTime)
@@ -316,7 +317,7 @@ func createTestPlan(testTmpDir string) core.BackupPlan {
 	}
 
 	var plan core.BackupPlan
-	plan.Name = "test_plan_" + randString(20)
+	plan.Name = "test_plan_" + testutils.RandString(20)
 	plan.ChunkSize = core.DefaultChunkSizeMB * 1024 * 1024
 	plan.NodesToArchive = append(plan.NodesToArchive, filepath.Join(testTmpDir, "_data"))
 
@@ -340,7 +341,7 @@ func createTestPlan(testTmpDir string) core.BackupPlan {
 }
 
 func createTestTmpDir() string {
-	dirPath := filepath.Join(tmpDir(), randString(20))
+	dirPath := filepath.Join(testutils.TmpDir(), testutils.RandString(20))
 	err := os.Mkdir(dirPath, 0770)
 	if err == nil {
 		for _, subDir := range []string{"_storage", "_data", "_app"} {
@@ -357,35 +358,9 @@ func createTestTmpDir() string {
 }
 
 func removeTestTmpDir(dirPath string) {
-	if base.IsPathInBasePath(tmpDir(), dirPath) {
+	if base.IsPathInBasePath(testutils.TmpDir(), dirPath) {
 		os.RemoveAll(dirPath)
 	} else {
 		panic("Could not remove files from non-tmp path")
 	}
-}
-
-func tmpDir() string {
-	varNames := []string{"TMPDIR", "TMP", "TEMP"}
-	val := ""
-	for _, v := range varNames {
-		val = os.Getenv(v)
-		if val != "" {
-			break
-		}
-	}
-	if val == "" {
-		panic("No tmp path determined")
-	}
-	return val
-}
-
-var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-
-func randString(n int) string {
-	rand.Seed(time.Now().UnixNano())
-	b := make([]rune, n)
-	for i := range b {
-		b[i] = letterRunes[rand.Intn(len(letterRunes))]
-	}
-	return string(b)
 }
