@@ -347,7 +347,11 @@ func (plan BackupPlan) DoBackup() error {
 	for _, chunk := range plan.GetNodeChunks(procNodes) {
 		archName := plan.GetNextArchiveName()
 		archFilepath := filepath.Join(plan.TmpDir, fmt.Sprint(archName, ".zip"))
-		doneNodes := ArchiveNodes(chunk, archFilepath)
+		var encrypter *crypter.Encrypter
+		if plan.Encrypt {
+			encrypter = crypter.GetEncrypter(plan.Encrypt_passphrase)
+		}
+		doneNodes := ArchiveNodes(chunk, archFilepath, encrypter)
 		base.Log.Printf("Archive %v created", archName)
 		archMetaFilepath := filepath.Join(plan.TmpDir, GetMetaFileName(archName))
 		archMeta := NewMetaFile(doneNodes, plan.Encrypt)
@@ -370,16 +374,11 @@ func (plan BackupPlan) DoBackup() error {
 
 func (plan BackupPlan) uploadArchiveToStorage(archName string) {
 	// заливаем архив в хранилище
-	var encrypter *crypter.Encrypter
-	if plan.Encrypt {
-		encrypter = crypter.GetEncrypter(plan.Encrypt_passphrase)
-	}
-
 	archMetaFilepath := filepath.Join(plan.TmpDir, GetMetaFileName(archName))
 	archMeta := GetMetaFile(archMetaFilepath)
 
 	archFilepath := filepath.Join(plan.TmpDir, fmt.Sprint(archName, ".zip"))
-	archiveStorageInfo, err := plan.Storage.UploadFile(archFilepath, encrypter, "")
+	archiveStorageInfo, err := plan.Storage.UploadFile(archFilepath, "")
 	if err != nil {
 		base.LogErr.Fatalln(err)
 	}
@@ -392,21 +391,36 @@ func (plan BackupPlan) uploadArchiveToStorage(archName string) {
 		plan.Storage.DeleteFile(archiveStorageInfo)
 		base.LogErr.Fatalln(err)
 	}
+
 	// заливаем метафайл в хранилище
-	encrypter = nil
+	// если в плане включено шифрование - шифруем и метафайл
+	metaFilePathToUpload := archMetaFilepath
+	var encArchMetaFilepath string
 	if plan.Encrypt {
-		encrypter = crypter.GetEncrypter(plan.Encrypt_passphrase)
+		encArchMetaFilepath = filepath.Join(filepath.Dir(archMetaFilepath), GetMetaFileNameEnc(archName))
+		err = crypter.EncryptFile(plan.Encrypt_passphrase, archMetaFilepath, encArchMetaFilepath)
+		if err != nil {
+			base.LogErr.Fatalf("Error while encrypting metafile: %v\n", err)
+		}
+		metaFilePathToUpload = encArchMetaFilepath
 	}
-	_, err = plan.Storage.UploadFile(archMetaFilepath, encrypter, GetMetaFileNameEnc(archName))
+
+	_, err = plan.Storage.UploadFile(metaFilePathToUpload, "")
 	if err != nil {
 		plan.Storage.DeleteFile(archiveStorageInfo)
-		base.LogErr.Fatalln(err)
+		base.LogErr.Fatalf("Error while uploading metafile to storage: %v\n", err)
 	}
 	base.Log.Printf("Metafile for archive %v uploaded to storage", archName)
 
 	err = os.Remove(archFilepath)
 	if err != nil {
 		base.LogErr.Println(err)
+	}
+	if plan.Encrypt {
+		err = os.Remove(encArchMetaFilepath)
+		if err != nil {
+			base.LogErr.Println(err)
+		}
 	}
 	err = os.Rename(archMetaFilepath, filepath.Join(plan.BaseDir, GetMetaFileName(archName)))
 	if err != nil {
@@ -455,11 +469,9 @@ func (plan BackupPlan) SyncMeta(cleanLocalMeta bool) error {
 	for _, pmf := range procMetaFiles {
 		base.Log.Printf("Start downloading metafile %v\n", pmf.GetFilename())
 		cf, encrypted := CleanMetaFileNameEnc(pmf.GetFilename())
-		var decrypter *crypter.Decrypter
-		if encrypted {
-			decrypter = crypter.GetDecrypter(plan.Encrypt_passphrase)
-		}
-		err := plan.Storage.DownloadFile(pmf.GetFileStorageId(), filepath.Join(plan.BaseDir, cf), decrypter)
+
+		downloadedFilePath := filepath.Join(plan.BaseDir, cf)
+		err := plan.DownloadAndDecryptFile(pmf.GetFileStorageId(), downloadedFilePath, encrypted)
 		if err != nil {
 			if err == base.ErrStorageRequestInProgress {
 				base.Log.Println(err)
@@ -468,7 +480,12 @@ func (plan BackupPlan) SyncMeta(cleanLocalMeta bool) error {
 				return err
 			}
 		} else {
-			base.Log.Printf("Finish downloading metafile %v\n", pmf.GetFilename())
+			if encrypted {
+				base.Log.Printf("Finish downloading metafile %v and decrypting to %v\n",
+					pmf.GetFilename(), cf)
+			} else {
+				base.Log.Printf("Finish downloading metafile %v\n", pmf.GetFilename())
+			}
 		}
 	}
 

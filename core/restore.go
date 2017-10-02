@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -293,12 +294,8 @@ ARCH_LOOP:
 			_, err := os.Stat(archLocalFilePath)
 			if err != nil {
 				if os.IsNotExist(err) {
-					var decrypter *crypter.Decrypter
-					if mf.encrypted {
-						decrypter = crypter.GetDecrypter(plan.Encrypt_passphrase)
-					}
 					base.Log.Printf("Start downloading archive %v\n", archName+".zip")
-					err = plan.Storage.DownloadFile(mf.GetStorageInfo(), archLocalFilePath, decrypter)
+					err = plan.DownloadAndDecryptFile(mf.GetStorageInfo(), archLocalFilePath, mf.encrypted)
 					if err == nil {
 						base.Log.Printf("Finish downloading archive %v\n", archName+".zip")
 					}
@@ -361,4 +358,33 @@ ARCH_LOOP:
 	// 		выходные: список восстановленных файлов, ошибка
 	// 		если восстанавливаемый файл существует, и совпадает размер и дата - пропускаем (считаем восстановлненным)
 	// 	- удаляем архив
+}
+
+func (plan BackupPlan) DownloadAndDecryptFile(fileStorageInfo map[string]string, localFilePath string, isEncrypted bool) error {
+	localFilePathShadow := localFilePath + "~"
+	fileWriter, err := os.OpenFile(localFilePathShadow, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0660)
+	if err != nil {
+		return err
+	}
+	defer fileWriter.Close()
+
+	w := io.Writer(fileWriter)
+	var decrypter *crypter.Decrypter
+	if isEncrypted {
+		decrypter = crypter.GetDecrypter(plan.Encrypt_passphrase)
+		decrypter.InitWriter(fileWriter)
+		w = io.Writer(decrypter)
+	}
+
+	err = plan.Storage.DownloadFileToPipe(fileStorageInfo, w)
+	if err != nil {
+		fileWriter.Close()
+		os.Remove(localFilePathShadow)
+		return err
+	}
+	if fileWriter.Close(); err != nil {
+		return err
+	}
+
+	return os.Rename(localFilePathShadow, localFilePath)
 }

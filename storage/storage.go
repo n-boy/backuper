@@ -2,18 +2,19 @@ package storage
 
 import (
 	"github.com/n-boy/backuper/base"
-	"github.com/n-boy/backuper/crypter"
 	"github.com/n-boy/backuper/storage/toglacier"
 	"github.com/n-boy/backuper/storage/tolocalfs"
 
 	"fmt"
+	"io"
 	"reflect"
 )
 
 type GenericStorage interface {
 	GetStorageConfig() map[string]string
-	UploadFile(filePath string, encrypter *crypter.Encrypter, remoteFileName string) (map[string]string, error)
-	DownloadFile(fileStorageId map[string]string, localFilePath string, decrypter *crypter.Decrypter) error
+	UploadFile(filePath string, remoteFileName string) (map[string]string, error)
+	DownloadFile(fileStorageId map[string]string, localFilePath string) error
+	DownloadFileToPipe(fileStorageId map[string]string, pipe io.Writer) error
 	DeleteFile(fileStorageInfo map[string]string) error
 	GetFilesList() ([]base.GenericStorageFileInfo, error)
 	GetType() string

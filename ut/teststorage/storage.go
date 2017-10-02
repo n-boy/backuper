@@ -32,7 +32,7 @@ func CheckUploadDownloadFile(t *testing.T, s storage.GenericStorage, fileSize in
 	defer deleteTempFile(t, sourceFilePath)
 
 	var fileStorageInfo map[string]string
-	fileStorageInfo, err = s.UploadFile(sourceFilePath, nil, filepath.Base(sourceFilePath))
+	fileStorageInfo, err = s.UploadFile(sourceFilePath, filepath.Base(sourceFilePath))
 	if err != nil {
 		t.Fatalf("Test died. Step: UploadFile, Name: %v, error: %v\n", testName, err)
 	} else {
@@ -50,27 +50,36 @@ func CheckUploadDownloadFile(t *testing.T, s storage.GenericStorage, fileSize in
 
 	deleteTempFile(t, sourceFilePath)
 
-	var restoredFilePath = filepath.Join(testutils.TmpDir(), testutils.RandString(20)+".bin")
-	err = downloadFile(t, s, fileStorageInfo, restoredFilePath)
-	if err != nil {
-		t.Fatalf("Test died. Step: DownloadFile, Name: %v, error: %v\n", testName, err)
-	} else {
-		t.Logf("Restored file downloaded: %v", restoredFilePath)
-	}
-	defer deleteTempFile(t, restoredFilePath)
+	// check two methods for download in one test because of very long time to wait for downloading separate file
+	// from some types of storages (AWS Glacier)
+	for _, target := range []string{"file", "pipe"} {
+		var restoredFilePath = filepath.Join(testutils.TmpDir(), testutils.RandString(20)+".bin")
+		if target == "file" {
+			err = downloadFile(t, s, fileStorageInfo, restoredFilePath)
+		} else {
+			err = downloadFileToPipe(t, s, fileStorageInfo, restoredFilePath)
+		}
+		if err != nil {
+			t.Fatalf("Test died. Step: DownloadFile, Target: %v, Name: %v, error: %v\n", target, testName, err)
+		} else {
+			t.Logf("Restored file downloaded: %v (target: %v)", restoredFilePath, target)
+		}
+		defer deleteTempFile(t, restoredFilePath)
 
-	var restoredMD5 string
-	restoredMD5, err = testutils.CalcFileMD5(restoredFilePath)
-	if err != nil {
-		t.Fatalf("Test died. Step: CalcRestoredFileMD5, Name: %v, error: %v\n", testName, err)
-	} else {
-		t.Logf("Restored file md5 calculated: %v", restoredMD5)
-	}
+		var restoredMD5 string
+		restoredMD5, err = testutils.CalcFileMD5(restoredFilePath)
+		if err != nil {
+			t.Fatalf("Test died. Step: CalcRestoredFileMD5, Target: %v, Name: %v, error: %v\n", target, testName, err)
+		} else {
+			t.Logf("Restored file md5 calculated: %v (target: %v)", restoredMD5, target)
+		}
 
-	if sourceMD5 != restoredMD5 {
-		t.Errorf("Test failed. Step: CompareMD5, Name: %v, expected: %v, got: %v\n", testName, sourceMD5, restoredMD5)
-	} else {
-		t.Logf("Test passed. Step: CompareMD5, Name: %v", testName)
+		if sourceMD5 != restoredMD5 {
+			t.Errorf("Test failed. Step: CompareMD5, Target: %v, Name: %v, expected: %v, got: %v\n",
+				target, testName, sourceMD5, restoredMD5)
+		} else {
+			t.Logf("Test passed. Step: CompareMD5, Name: %v, Target: %v", testName, target)
+		}
 	}
 }
 
@@ -87,7 +96,7 @@ func CheckGetFilesList(t *testing.T, s storage.GenericStorage, fileSize int, wai
 	defer deleteTempFile(t, sourceFilePath)
 
 	var fileStorageInfo map[string]string
-	fileStorageInfo, err = s.UploadFile(sourceFilePath, nil, filepath.Base(sourceFilePath))
+	fileStorageInfo, err = s.UploadFile(sourceFilePath, filepath.Base(sourceFilePath))
 	if err != nil {
 		t.Fatalf("Test died. Step: UploadFile, Name: %v, error: %v\n", testName, err)
 	} else {
@@ -135,7 +144,7 @@ func CheckDeleteFile(t *testing.T, s storage.GenericStorage, fileSize int, useFi
 	defer deleteTempFile(t, sourceFilePath)
 
 	var fileStorageInfo map[string]string
-	fileStorageInfo, err = s.UploadFile(sourceFilePath, nil, filepath.Base(sourceFilePath))
+	fileStorageInfo, err = s.UploadFile(sourceFilePath, filepath.Base(sourceFilePath))
 	if err != nil {
 		t.Fatalf("Test died. Step: UploadFile, Name: %v, error: %v\n", testName, err)
 	} else {
@@ -221,7 +230,20 @@ func deleteTempFile(t *testing.T, filePath string) error {
 
 func downloadFile(t *testing.T, s storage.GenericStorage, fileStorageInfo map[string]string, restoredFilePath string) error {
 	action := func() error {
-		return s.DownloadFile(fileStorageInfo, restoredFilePath, nil)
+		return s.DownloadFile(fileStorageInfo, restoredFilePath)
+	}
+	return waitRequestInProgress(t, action, base.StorageRequestInProgressRetrySeconds, 0)
+}
+
+func downloadFileToPipe(t *testing.T, s storage.GenericStorage, fileStorageInfo map[string]string, restoredFilePath string) error {
+	fileWriter, err := os.OpenFile(restoredFilePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0660)
+	if err != nil {
+		return err
+	}
+	defer fileWriter.Close()
+
+	action := func() error {
+		return s.DownloadFileToPipe(fileStorageInfo, fileWriter)
 	}
 	return waitRequestInProgress(t, action, base.StorageRequestInProgressRetrySeconds, 0)
 }

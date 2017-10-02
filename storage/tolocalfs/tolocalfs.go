@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/n-boy/backuper/base"
-	"github.com/n-boy/backuper/crypter"
+	storageutils "github.com/n-boy/backuper/storage/utils"
 )
 
 type LocalFSStorage struct {
@@ -42,7 +42,7 @@ func (ls LocalFSStorage) GetStorageConfig() map[string]string {
 	return config
 }
 
-func (ls LocalFSStorage) UploadFile(filePath string, encrypter *crypter.Encrypter, remoteFileName string) (map[string]string, error) {
+func (ls LocalFSStorage) UploadFile(filePath string, remoteFileName string) (map[string]string, error) {
 	result := make(map[string]string)
 
 	fileReader, err := os.Open(filePath)
@@ -63,15 +63,7 @@ func (ls LocalFSStorage) UploadFile(filePath string, encrypter *crypter.Encrypte
 	}
 	defer fileWriter.Close()
 
-	if encrypter != nil {
-		w, err := encrypter.InitWriter(fileWriter)
-		if err != nil {
-			return result, err
-		}
-		_, err = io.Copy(w, fileReader)
-	} else {
-		_, err = io.Copy(fileWriter, fileReader)
-	}
+	_, err = io.Copy(fileWriter, fileReader)
 	if err != nil {
 		return result, err
 	}
@@ -87,38 +79,23 @@ func (ls LocalFSStorage) UploadFile(filePath string, encrypter *crypter.Encrypte
 	return result, nil
 }
 
-func (ls LocalFSStorage) DownloadFile(fileStorageId map[string]string, localFilePath string,
-	decrypter *crypter.Decrypter) error {
+func (ls LocalFSStorage) DownloadFile(fileStorageId map[string]string, localFilePath string) error {
+	downloadAction := func(pipe io.Writer) error {
+		return ls.DownloadFileToPipe(fileStorageId, pipe)
+	}
+	return storageutils.DownloadFile(downloadAction, localFilePath)
+}
+
+func (ls LocalFSStorage) DownloadFileToPipe(fileStorageId map[string]string, pipe io.Writer) error {
 	fileReader, err := os.Open(filepath.Join(ls.path, fileStorageId["filename"]))
 	if err != nil {
 		return err
 	}
 	defer fileReader.Close()
 
-	localFilePathShadow := localFilePath + "~"
-	fileWriter, err := os.OpenFile(localFilePathShadow, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0660)
-	if err != nil {
-		return err
-	}
-	defer fileWriter.Close()
+	_, err = io.Copy(pipe, fileReader)
 
-	if decrypter != nil {
-		r, err := decrypter.InitReader(fileReader)
-		if err != nil {
-			return err
-		}
-		_, err = io.Copy(fileWriter, r)
-	} else {
-		_, err = io.Copy(fileWriter, fileReader)
-	}
-	if err != nil {
-		return err
-	}
-	if fileWriter.Close(); err != nil {
-		return err
-	}
-
-	return os.Rename(localFilePathShadow, localFilePath)
+	return err
 }
 
 func (ls LocalFSStorage) DeleteFile(fileStorageInfo map[string]string) error {

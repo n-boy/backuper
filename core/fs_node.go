@@ -14,6 +14,7 @@ type NodeMetaInfo struct {
 	size    int64
 	modtime time.Time
 	is_dir  bool
+	md5     string
 }
 
 type NodeList struct {
@@ -54,6 +55,14 @@ func (node *NodeMetaInfo) IsDir() bool {
 
 func (node *NodeMetaInfo) Size() int64 {
 	return node.size
+}
+
+func (node *NodeMetaInfo) Md5() string {
+	return node.md5
+}
+
+func (node *NodeMetaInfo) SetMd5(md5 string) {
+	node.md5 = md5
 }
 
 func GetNodeCurrentFormat() []string {

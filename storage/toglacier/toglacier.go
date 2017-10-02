@@ -20,7 +20,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/glacier"
 
 	"github.com/n-boy/backuper/base"
-	"github.com/n-boy/backuper/crypter"
+	storageutils "github.com/n-boy/backuper/storage/utils"
 )
 
 // must be power of two
@@ -71,7 +71,7 @@ func (gs GlacierStorage) GetStorageConfig() map[string]string {
 	return config
 }
 
-func (gs GlacierStorage) UploadFile(filePath string, encrypter *crypter.Encrypter, remoteFileName string) (map[string]string, error) {
+func (gs GlacierStorage) UploadFile(filePath string, remoteFileName string) (map[string]string, error) {
 	result := make(map[string]string)
 
 	fileReader, err := os.Open(filePath)
@@ -174,8 +174,15 @@ func (gs GlacierStorage) UploadFile(filePath string, encrypter *crypter.Encrypte
 	return result, nil
 }
 
-func (gs GlacierStorage) DownloadFile(fileStorageId map[string]string, localFilePath string,
-	decrypter *crypter.Decrypter) error {
+func (gs GlacierStorage) DownloadFile(fileStorageId map[string]string, localFilePath string) error {
+	downloadAction := func(pipe io.Writer) error {
+		return gs.DownloadFileToPipe(fileStorageId, pipe)
+	}
+	return storageutils.DownloadFile(downloadAction, localFilePath)
+}
+
+func (gs GlacierStorage) DownloadFileToPipe(fileStorageId map[string]string, pipe io.Writer) error {
+
 	activeJob, err := gs.findJob(glacier.ActionCodeArchiveRetrieval, fileStorageId["ArchiveId"])
 	if err != nil {
 		return err
@@ -214,15 +221,7 @@ func (gs GlacierStorage) DownloadFile(fileStorageId map[string]string, localFile
 		return err
 	}
 
-	localFilePathShadow := fmt.Sprint(localFilePath, "~")
-
-	localFileWriter, err := os.Create(localFilePathShadow)
-	if err != nil {
-		return err
-	}
-	defer localFileWriter.Close()
-
-	bufWriter := bufio.NewWriterSize(localFileWriter, 16*1024*1024)
+	bufWriter := bufio.NewWriterSize(pipe, 16*1024*1024)
 
 	buf := make([]byte, 4*1024*1024)
 	for {
@@ -240,11 +239,8 @@ func (gs GlacierStorage) DownloadFile(fileStorageId map[string]string, localFile
 	}
 	if err = bufWriter.Flush(); err != nil {
 		return err
-	} else if err = localFileWriter.Close(); err != nil {
-		return err
 	}
-	err = os.Rename(localFilePathShadow, localFilePath)
-	return err
+	return nil
 }
 
 func (gs GlacierStorage) DeleteFile(fileStorageInfo map[string]string) error {
@@ -324,7 +320,8 @@ func (gs GlacierStorage) findJob(jobAction string, archiveId string) (*glacier.J
 	}
 	var activeJob *glacier.JobDescription
 	for _, job := range jobsList.JobList {
-		if *job.StatusCode == glacier.StatusCodeFailed ||
+		if *job.StatusCode == glacier.StatusCodeFailed &&
+			!(jobAction == glacier.ActionCodeArchiveRetrieval && *job.StatusMessage == "ARCHIVE_DELETED") ||
 			*job.Action != jobAction {
 			continue
 		}
@@ -357,7 +354,7 @@ func (gs GlacierStorage) getJob(jobId *string) (*glacier.JobDescription, error) 
 func (gs GlacierStorage) waitJobComplete(job *glacier.JobDescription, timeout int, repeatPause int) (*glacier.JobDescription, error) {
 	var err error
 	timeStart := time.Now()
-	for *job.Completed == false {
+	for *job.Completed == false && *job.StatusCode != glacier.StatusCodeFailed {
 		time.Sleep(time.Duration(repeatPause) * time.Second)
 		if time.Since(timeStart).Seconds() > float64(timeout) {
 			break
@@ -368,7 +365,7 @@ func (gs GlacierStorage) waitJobComplete(job *glacier.JobDescription, timeout in
 		}
 	}
 
-	if *job.Completed == true {
+	if *job.Completed == true || *job.StatusCode == glacier.StatusCodeFailed {
 		if *job.StatusCode == glacier.StatusCodeFailed {
 			return job, errors.New(*job.StatusMessage)
 		}

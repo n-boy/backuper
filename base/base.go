@@ -76,8 +76,9 @@ func SetAppConfig(config AppConfig) {
 	appConfig = config
 }
 
-func InitLogToDestination(dw *io.Writer) {
-	if dw == nil {
+func InitLogToDestination(dwref *io.Writer) {
+	var dw io.Writer
+	if dwref == nil {
 		filePath := filepath.Join(GetAppDir(), "history.log")
 
 		fh, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
@@ -85,18 +86,21 @@ func InitLogToDestination(dw *io.Writer) {
 			panic(err)
 		}
 
-		*dw = fh
+		dw = (io.Writer)(fh)
+	} else {
+		dw = *dwref
 	}
 
-	w := io.MultiWriter(*dw)
+	w := io.MultiWriter(dw)
+
 	if appConfig.LogToStdout {
-		w = io.MultiWriter(*dw, os.Stdout)
+		w = io.MultiWriter(dw, os.Stdout)
 	}
 	Log = log.New(w, "[INFO] ", log.LstdFlags)
 
-	w = io.MultiWriter(*dw)
+	w = io.MultiWriter(dw)
 	if appConfig.LogToStdout {
-		w = io.MultiWriter(*dw, os.Stderr)
+		w = io.MultiWriter(dw, os.Stderr)
 	}
 	LogErr = log.New(w, "[ERROR] ", log.LstdFlags)
 }

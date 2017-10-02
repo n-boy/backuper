@@ -60,14 +60,12 @@ func GetMetaFileNameRE() *regexp.Regexp {
 	return regexp.MustCompile(`^archive_\d+_\d+_meta.yaml(\.enc)?$`)
 }
 
-func GetMetaFile(metaFilePath string) ArchiveMetafile {
-	yamlContent, err := ioutil.ReadFile(metaFilePath)
-	if err != nil {
-		base.LogErr.Fatalln(err)
-	}
+func GetArchiveFileNameRE() *regexp.Regexp {
+	return regexp.MustCompile(`^archive_\d+_\d+.zip$`)
+}
 
-	yamlMF := yamlArchiveMetafile{}
-	err = yaml.Unmarshal(yamlContent, &yamlMF)
+func GetMetaFile(metaFilePath string) ArchiveMetafile {
+	yamlMF, err := ParseMetaFile(metaFilePath)
 	if err != nil {
 		base.LogErr.Fatalln(err)
 	}
@@ -90,6 +88,18 @@ func GetMetaFile(metaFilePath string) ArchiveMetafile {
 		archMeta.nodes = append(archMeta.nodes, node)
 	}
 	return archMeta
+}
+
+func ParseMetaFile(metaFilePath string) (yamlArchiveMetafile, error) {
+	yamlMF := yamlArchiveMetafile{}
+	yamlContent, err := ioutil.ReadFile(metaFilePath)
+	if err != nil {
+		return yamlMF, err
+	}
+
+	err = yaml.Unmarshal(yamlContent, &yamlMF)
+
+	return yamlMF, err
 }
 
 func NewMetaFile(nodes []NodeMetaInfo, encrypted bool) ArchiveMetafile {

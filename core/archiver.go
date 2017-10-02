@@ -10,16 +10,23 @@ import (
 	"regexp"
 
 	"github.com/n-boy/backuper/base"
+	"github.com/n-boy/backuper/crypter"
 )
 
-func ArchiveNodes(nodes []NodeMetaInfo, archFilePath string) (nodesArch []NodeMetaInfo) {
+func ArchiveNodes(nodes []NodeMetaInfo, archFilePath string, encrypter *crypter.Encrypter) (nodesArch []NodeMetaInfo) {
 	archFileWriter, err := os.Create(archFilePath)
 	if err != nil {
 		base.LogErr.Fatalln(err)
 	}
 	defer archFileWriter.Close()
 
-	bufWriter := bufio.NewWriterSize(archFileWriter, 16*1024*1024)
+	archWriter := io.Writer(archFileWriter)
+	if encrypter != nil {
+		encrypter.InitWriter(archFileWriter)
+		archWriter = io.Writer(encrypter)
+	}
+
+	bufWriter := bufio.NewWriterSize(archWriter, 16*1024*1024)
 	w := zip.NewWriter(bufWriter)
 
 	for _, node := range nodes {
@@ -82,8 +89,6 @@ func UnarchiveNodes(archFilePath string, nodes []NodeMetaInfo, targetPath string
 	for _, f := range zipReader.File {
 		nodesInArchiveMap[f.Name] = f
 	}
-
-	// enc_stream := getEncryptStream(encrypt_passphrase)
 
 	for _, node := range nodes {
 		var targetFilePath string
