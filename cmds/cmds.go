@@ -204,9 +204,9 @@ func Restore(plan core.BackupPlan) {
 	if !plan.CheckOpLocked("restore") {
 		pathList := getInputList("Provide pathes you want to restore", "one more path", true,
 			func(path string) error {
-				if path != "" && !filepath.IsAbs(path) {
-					return fmt.Errorf("Path should be absolute path to directory or file")
-				}
+				// if path != "" && !filepath.IsAbs(path) {
+				// 	return fmt.Errorf("Path should be absolute path to directory or file")
+				// }
 				return nil
 			})
 		restorePoints := plan.GetRestorePoints(pathList)

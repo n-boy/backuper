@@ -117,13 +117,18 @@ func GetAppDir() string {
 }
 
 func createAppDir() string {
-	var basePath string
+	var basePath = ""
 
-	switch runtime.GOOS {
-	case "windows":
-		basePath = os.Getenv("LOCALAPPDATA")
-	case "darwin":
-		basePath = filepath.Join(os.Getenv("HOME"), "Library", "Application Support")
+	if basePath == "" {
+		switch runtime.GOOS {
+		case "windows":
+			basePath = os.Getenv("LOCALAPPDATA")
+		case "darwin":
+			basePath = filepath.Join(os.Getenv("HOME"), "Library", "Application Support")
+		case "linux":
+			// basePath = filepath.Join(os.Getenv("HOME"))
+			basePath = "/nfs/Public/Backup"
+		}
 	}
 	appDir := filepath.Join(basePath, "Backuper")
 

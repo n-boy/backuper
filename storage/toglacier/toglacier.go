@@ -24,7 +24,7 @@ import (
 )
 
 // must be power of two
-const MultipartUploadPartSize = 8 * 1024 * 1024
+const MultipartUploadPartSize = 32 * 1024 * 1024
 
 type GlacierStorage struct {
 	region                string `name:"region" title:"AWS Region"`
@@ -130,6 +130,8 @@ func (gs GlacierStorage) UploadFile(filePath string, remoteFileName string) (map
 			Range:     aws.String(fmt.Sprintf("bytes %d-%d/*", rangeStart, rangeFinish)),
 		}
 
+		base.Log.Println(fmt.Sprintf("Start uploading of part %d, range: %d - %d", i+1, rangeStart, rangeFinish))
+		t0 := time.Now().Unix()
 		_, err := gs.getStorageClient().UploadMultipartPart(uploadPartParams)
 		if err != nil {
 			// errors ignoring upload aborting
@@ -137,10 +139,10 @@ func (gs GlacierStorage) UploadFile(filePath string, remoteFileName string) (map
 			if err2 != nil {
 				base.LogErr.Printf("Error while aborting multipart upload: %v", err2)
 			}
-
 			return result, err
 		} else {
-			base.Log.Println(fmt.Sprintf("Uploaded part %d of %d", i+1, numOfParts))
+			speed := (rangeFinish - rangeStart) / (time.Now().Unix() - t0 + 1) / 1024 * 8
+			base.Log.Println(fmt.Sprintf("Uploaded part %d of %d (%d KBit/s)", i+1, numOfParts, speed))
 		}
 	}
 
