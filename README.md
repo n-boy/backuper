@@ -89,4 +89,11 @@ go get -u github.com/jteeuwen/go-bindata/...
 go generate
 ```
 
+**update dependencies in go.mod**
+```
+go mod init github.com/n-boy/backuper
+go mod tidy
+```
+
+
 *Tested on Mac OS X, MS Windows 7*
