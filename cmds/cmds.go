@@ -93,6 +93,28 @@ func createOrEdit(plan core.BackupPlan, is_new bool) {
 			})
 	}
 
+	editExclusions := false
+	if !is_new {
+		fmt.Println("Currenct list of exclusion masks to skip and not backup:")
+		for _, path := range plan.ExcludeMasks {
+			fmt.Printf("    %v\n", path)
+		}
+		editExclusions, _ = parseCmdsBool(getInput("Do you want set up new list of exclusion masks to skip and not backup? [Y/N]", "",
+			func(text string) error {
+				return checkCmdsBool(text)
+			}))
+	}
+
+	if is_new || editExclusions {
+		plan.ExcludeMasks = getInputList("Provide exclusion masks you want to skip and not backup", "one more mask", false,
+			func(mask string) error {
+				if mask != "" {
+					// additional validations for mask can be added
+				}
+				return nil
+			})
+	}
+
 	defaultStorageType := ""
 	if !is_new && plan.Storage != nil {
 		defaultStorageType = plan.Storage.GetType()
@@ -141,6 +163,7 @@ func createOrEdit(plan core.BackupPlan, is_new bool) {
 	// encrypt            bool
 	// encrypt_passphrase string
 	// nodesToArchive     []string
+	// excludeMasks     []string
 	// storage            storage.GenericStorage
 
 }
@@ -165,6 +188,11 @@ func View(plan core.BackupPlan) {
 	fmt.Println("Pathes to backup:")
 	for _, path := range plan.NodesToArchive {
 		fmt.Printf("    %v\n", path)
+	}
+
+	fmt.Println("Exclusion masks to skip and not backup:")
+	for _, mask := range plan.ExcludeMasks {
+		fmt.Printf("    %v\n", mask)
 	}
 
 	fmt.Printf("\nStorage type: %v\n", plan.Storage.GetType())

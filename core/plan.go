@@ -25,6 +25,7 @@ type BackupPlan struct {
 	Encrypt            bool
 	Encrypt_passphrase string
 	NodesToArchive     []string
+	ExcludeMasks	   []string
 	Storage            storage.GenericStorage
 
 	cacheMetaFiles map[string]ArchiveMetafile
@@ -32,6 +33,7 @@ type BackupPlan struct {
 
 type yamlBackupPlanStruct struct {
 	FilesList         []string `yaml:"files_list"`
+	ExcludeMasks      []string `yaml:"exclude_masks"`
 	Storage           map[string]string
 	ChunkSizeMB       int64  `yaml:"chunk_size_mb"`
 	Encrypt           bool   `yaml:"encrypt"`
@@ -69,6 +71,7 @@ func GetBackupPlan(planName string) (BackupPlan, error) {
 	}
 
 	plan.NodesToArchive = yamlBP.FilesList
+	plan.ExcludeMasks = yamlBP.ExcludeMasks
 	plan.Storage, err = storage.NewStorage(yamlBP.Storage)
 	if err != nil {
 		base.LogErr.Fatalln(err)
@@ -124,6 +127,7 @@ func (plan *BackupPlan) SavePlan(overwrite bool) error {
 
 	yamlBP := yamlBackupPlanStruct{
 		FilesList:         plan.NodesToArchive,
+		ExcludeMasks:      plan.ExcludeMasks,
 		ChunkSizeMB:       plan.ChunkSize / 1024 / 1024,
 		Encrypt:           plan.Encrypt,
 		EncryptPassphrase: plan.Encrypt_passphrase,
@@ -270,6 +274,9 @@ func (plan BackupPlan) GetProcessNodes(guardNodes []NodeMetaInfo, archNodesMap m
 	procNodes := make([]NodeMetaInfo, 0)
 	for _, node := range guardNodes {
 		anode, anode_exists := archNodesMap[node.path]
+		if plan.IsNodeExcluded(node) {
+			continue
+		}
 		if !anode_exists ||
 			(!node.is_dir &&
 				(anode.size != node.size ||
@@ -278,6 +285,15 @@ func (plan BackupPlan) GetProcessNodes(guardNodes []NodeMetaInfo, archNodesMap m
 		}
 	}
 	return procNodes
+}
+
+func (plan BackupPlan) IsNodeExcluded(node NodeMetaInfo) bool {
+	for _, mask := range plan.ExcludeMasks {
+		if mask != "" && strings.Contains(node.path, mask) {
+			return true
+		}
+	}
+	return false
 }
 
 func (plan BackupPlan) GetNodeChunks(nodes []NodeMetaInfo) [][]NodeMetaInfo {
