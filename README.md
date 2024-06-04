@@ -95,5 +95,9 @@ go mod init github.com/n-boy/backuper
 go mod tidy
 ```
 
+**parameters to use when building a binary for Linux
+```
+GOOS=linux GOARCH=amd64 go build
+```
 
 *Tested on Mac OS X, MS Windows 7*
