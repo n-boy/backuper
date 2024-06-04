@@ -126,8 +126,7 @@ func createAppDir() string {
 		case "darwin":
 			basePath = filepath.Join(os.Getenv("HOME"), "Library", "Application Support")
 		case "linux":
-			// basePath = filepath.Join(os.Getenv("HOME"))
-			basePath = "/nfs/Public/Backup"
+			basePath = filepath.Join(os.Getenv("HOME"))
 		}
 	}
 	appDir := filepath.Join(basePath, "Backuper")
